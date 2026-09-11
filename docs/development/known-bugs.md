@@ -1222,7 +1222,7 @@ EXTERNA produz lixo — ✅ CORRIGIDO (teste `NativeE2ETest.nativeLambdaMutableC
 
 ---
 
-### 65. Frontend JS/browser: `Audio`/`Video` em `Window.show()` não chegam ao DOM real (Chrome) — ABERTO (lane UI)
+### 65. Frontend JS/browser: `Audio`/`Video` em `Window.show()` não chegam ao DOM real (Chrome) — ✅ NÃO REPRODUZ (reverificado 11/09)
 
 - **Introduzido por:** merge da PR #39 (`kof-ui-media-widgets`) em beta-0.3.0
   (08/09) — não é regressão de outra lane (confirmado: falha no HEAD limpo,
@@ -1264,9 +1264,26 @@ EXTERNA produz lixo — ✅ CORRIGIDO (teste `NativeE2ETest.nativeLambdaMutableC
   → A falha é de TEMPO DE RUNTIME/ordem de montagem no browser (requer depurar
   com Chrome devtools), não de codegen. O teste `dumpDom` usa `--dump-dom
   --virtual-time-budget=8000`.
-- **Impacto na gate:** 2 testes vermelhos fora do par riscv/aarch (bug 59)
-  para qualquer agente que rode a suíte completa com Chrome instalado.
-  Quem corrigir: UI lane (dono da PR #39).
+- **Impacto na gate (não se confirmou — ver reverificação abaixo):** 2 testes
+  vermelhos fora do par riscv/aarch (bug 59) para qualquer agente que rode a
+  suíte completa com Chrome instalado. Quem corrigir: UI lane (dono da PR #39).
+- **Reverificado 11/09 — não reproduz em nenhum ponto testado, inclusive no
+  commit que registrou esta entrada.** Os dois testes do sintoma rodam com
+  Chrome real (não são pulados) e passam:
+  - **macOS arm64 + Google Chrome 152:** `audioRendersInRealBrowserDom` e
+    `videoRendersInRealBrowserDom` verdes na `main` (`9cdebe60`), na
+    `beta-0.4.0` (`3606ce21`) e no próprio `d090ca7f`, o commit que abriu
+    esta entrada.
+  - **CI `ci.yml` (ubuntu-latest, `google-chrome` no PATH, `mvn clean
+    package`):** `KofJsBrowserE2ETest` com 21 testes / 0 falhas / 0 pulados
+    já em 09/09 (`a6ba64d0`, horas depois do registro) e 22 / 0 / 0 em 11/09
+    (`3606ce21`). Das 218 execuções da CI entre 09/09 e 11/09, 84 falharam
+    e nenhuma delas por esses dois testes.
+
+  Não há commit que "corrigiu" o sintoma: ele não aparece nem no ponto de
+  registro. A falha original veio do ambiente de quem a observou, sem causa
+  identificada. Se reaparecer, reabrir com versão do Chrome, SO e a saída do
+  `--dump-dom`.
 
 ### 66. `record` com construtor explícito canônico → `<init>` duplicado (ClassFormatError no JVM) — ✅ CORRIGIDO 09/09
 
