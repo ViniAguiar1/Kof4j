@@ -38,6 +38,12 @@ class KofJsBrowserE2ETest {
                 if (Files.isExecutable(p)) return p;
             }
         }
+        for (String app : List.of(
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "/Applications/Chromium.app/Contents/MacOS/Chromium")) {
+            Path p = Path.of(app);
+            if (Files.isExecutable(p)) return p;
+        }
         return null;
     }
 
