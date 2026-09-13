@@ -25,21 +25,10 @@ public class JsArtifactWriter {
         Files.writeString(outputDir.resolve(fileName), code + sourceMapUrl);
     }
 
-    /** Marcador de sementes no artefato: união entre módulos + observabilidade. */
     private static final String SEED_TAG = "// kof:seeds ";
     private static final String UNIT_TAG = "// kof:units ";
     private static final String FALLBACK_TAG = "// kof:fallback ";
 
-    /**
-     * Escreve o runtime por ALCANÇABILIDADE (issue #97, T2/S-6): só as unidades
-     * que o programa alcança, a partir da lista de import que o próprio emissor
-     * calculou — sem lista manual, sem o dev declarar o que usa.
-     *
-     * Num build multi-módulo o runtime é COMPARTILHADO: o conteúdo é a UNIÃO
-     * dos fechos de todos os módulos já escritos neste diretório, relida do
-     * cabeçalho do artefato. Sem isso, o primeiro módulo compilado decidiria
-     * acidentalmente o runtime dos seguintes.
-     */
     void writeRuntime(Path outputDir, Collection<String> runtimeImports,
                       Collection<String> ioRuntimeImports) throws IOException {
         Path core = outputDir.resolve("kof-runtime.mjs");
@@ -48,7 +37,7 @@ public class JsArtifactWriter {
         seeds.addAll(runtimeImports);
         seeds.addAll(ioRuntimeImports);
         if (Files.exists(core) && Files.exists(io) && seeds.equals(previousSeeds(core))) {
-            return;                                  // outro módulo já cobriu este fecho
+            return;
         }
         JsRuntimeSlices.Selection sel = JsRuntimeSlices.select(seeds);
         String header = header(seeds, sel);
@@ -68,7 +57,6 @@ public class JsArtifactWriter {
         return h.append('\n').toString();
     }
 
-    /** Sementes já cobertas pelo artefato deste diretório (build multi-módulo). */
     private static Set<String> previousSeeds(Path runtime) throws IOException {
         if (!Files.exists(runtime)) return Set.of();
         try (var lines = Files.lines(runtime)) {

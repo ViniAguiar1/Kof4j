@@ -11,31 +11,12 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Inventário do runtime JS por UNIDADE DE TOPO (issue #97, T2/S-6).
- *
- * Os blocos do runtime são concatenados pelo {@link JsArtifactWriter}; a
- * fronteira entre eles é acidental (o corte em 17 constantes veio do limite de
- * 64 KiB do pool de constantes do javac, não de fronteira semântica), então
- * poda por bloco não serve: o fecho de um `println` pega 89% dos bytes. A
- * unidade de poda é a declaração de topo — `function`/`class`/`const` na
- * coluna 0 depois de desindentar o bloco.
- *
- * Determinismo: a saída é sempre a ordem do inventário (bloco, unidade),
- * nunca a ordem de descoberta da busca nem de iteração de mapa.
- *
- * Fallback conservador (R6): o que a análise não consegue PROVAR que entende
- * entra inteiro, com motivo registrado — bytes a mais, nunca artefato quebrado.
- */
 final class JsRuntimeSlices {
 
-    /** Bloco do runtime, na mesma ordem em que o writer os concatena. */
     record Block(String name, String text, boolean io) {}
 
-    /** Unidade de topo: o que declara, o que referencia, e seu texto literal. */
     record Unit(int block, List<String> provides, Set<String> needs, boolean always, String text) {}
 
-    /** Seleção pronta para escrita, mais as notas de fallback (observabilidade). */
     record Selection(String coreText, String ioText, List<String> notes, int units, int total) {}
 
     static final List<Block> BLOCKS = List.of(
@@ -66,7 +47,6 @@ final class JsRuntimeSlices {
     private static final Pattern IDENT = Pattern.compile("[A-Za-z_$][\\w$]*");
     private static final Pattern QUOTED = Pattern.compile("[\"']([A-Za-z_$][\\w$]*)[\"']");
 
-    /** Padrões que a análise estática não resolve — presença ⇒ bloco inteiro. */
     private static final List<Map.Entry<Pattern, String>> GUARDS = List.of(
             Map.entry(Pattern.compile("\\beval\\s*\\("), "eval()"),
             Map.entry(Pattern.compile("\\bnew\\s+Function\\s*\\("), "new Function()"),
@@ -79,8 +59,6 @@ final class JsRuntimeSlices {
     private static Map<Integer, String> blockFallback;
 
     private JsRuntimeSlices() {}
-
-    // ── inventário ──────────────────────────────────────────────────
 
     private static synchronized void build() {
         if (units != null) return;
@@ -100,8 +78,6 @@ final class JsRuntimeSlices {
         for (int i = 0; i < inv.size(); i++) {
             for (String name : inv.get(i).provides()) providers.putIfAbsent(name, i);
         }
-        // nome do runtime dentro de literal de string = referência que a
-        // análise não enxerga: o bloco que a contém entra inteiro.
         for (int b = 0; b < BLOCKS.size(); b++) {
             if (fallback.containsKey(b)) continue;
             String quoted = quotedRuntimeName(BLOCKS.get(b).text(), providers.keySet());
@@ -132,13 +108,6 @@ final class JsRuntimeSlices {
         return inv;
     }
 
-    /**
-     * Fatia o bloco nas declarações de topo; o preâmbulo/wrapper sempre entra.
-     *
-     * A desindentação vale só para ACHAR as fronteiras (cada text block tem sua
-     * base própria) — o texto emitido é o original, byte a byte, porque
-     * desindentar mudaria o conteúdo de literais de template (CSS, HTML).
-     */
     private static List<Unit> chunk(int block, String text) {
         String[] raw = text.split("\n", -1);
         String[] code = strip(dedent(text)).split("\n", -1);
@@ -177,7 +146,6 @@ final class JsRuntimeSlices {
         return new Unit(block, List.copyOf(provides), Set.copyOf(needs), always, text);
     }
 
-    /** Motivo pelo qual o bloco NÃO pode ser fatiado com segurança, ou null. */
     private static String guardReason(String text, List<Unit> blockUnits) {
         String code = strip(text);
         for (Map.Entry<Pattern, String> guard : GUARDS) {
@@ -201,12 +169,6 @@ final class JsRuntimeSlices {
         return null;
     }
 
-    // ── seleção ─────────────────────────────────────────────────────
-
-    /**
-     * Fecho transitivo a partir das sementes (a lista de import do módulo).
-     * Sementes desconhecidas são ignoradas aqui e reportadas pelo writer.
-     */
     static Selection select(Collection<String> seeds) {
         build();
         boolean[] live = new boolean[units.size()];
@@ -217,7 +179,7 @@ final class JsRuntimeSlices {
                 work.add(i);
             }
         }
-        for (String seed : new TreeSet<>(seeds)) {              // ordem estável
+        for (String seed : new TreeSet<>(seeds)) {
             Integer i = owner.get(seed);
             if (i != null && !live[i]) {
                 live[i] = true;
@@ -236,16 +198,13 @@ final class JsRuntimeSlices {
         StringBuilder core = new StringBuilder();
         StringBuilder io = new StringBuilder();
         int kept = 0;
-        for (int b = 0; b < BLOCKS.size(); b++) {               // ordem do inventário
+        for (int b = 0; b < BLOCKS.size(); b++) {
             StringBuilder block = new StringBuilder();
             boolean first = true;
             for (int i = 0; i < units.size(); i++) {
                 Unit u = units.get(i);
                 if (u.block() != b || !live[i]) continue;
                 kept++;
-                // as unidades são faixas de LINHAS do bloco: a junção leva "\n"
-                // entre unidades adjacentes, que é o que reconstrói o texto
-                // original byte a byte quando nada é podado.
                 if (!first) block.append('\n');
                 block.append(u.text());
                 first = false;
@@ -260,7 +219,6 @@ final class JsRuntimeSlices {
         return new Selection(core.toString(), io.toString(), List.copyOf(notes), kept, units.size());
     }
 
-    /** Todos os nomes que o runtime declara (para testes e para o writer). */
     static Set<String> allProvided() {
         build();
         return owner.keySet();
@@ -271,9 +229,6 @@ final class JsRuntimeSlices {
         return units;
     }
 
-    // ── texto ───────────────────────────────────────────────────────
-
-    /** Cada text block tem sua própria indentação base; a coluna 0 é relativa a ela. */
     private static String dedent(String text) {
         int base = Integer.MAX_VALUE;
         for (String line : text.split("\n", -1)) {
@@ -292,13 +247,6 @@ final class JsRuntimeSlices {
         return out.toString();
     }
 
-    /**
-     * Neutraliza comentários, strings, templates e literais de regex,
-     * preservando posição de linha (cada caractere consumido vira espaço ou a
-     * própria quebra). Regex exige scanner: `/` é divisão ou início de literal
-     * conforme o último token significativo — e um `/[{}]/` mal lido
-     * desbalanceia a contagem de chaves e derruba o bloco no fallback.
-     */
     private static String strip(String text) {
         char[] out = text.toCharArray();
         int n = out.length;
@@ -329,7 +277,6 @@ final class JsRuntimeSlices {
         return new String(out);
     }
 
-    /** Depois destes tokens um `/` só pode abrir literal de regex. */
     private static boolean startsRegex(char prevSig) {
         return "(,=:[!&|?{};+-*%~^<>".indexOf(prevSig) >= 0;
     }
@@ -346,7 +293,7 @@ final class JsRuntimeSlices {
                 continue;
             }
             if (c == quote) { out[i] = ' '; return i; }
-            if (c == '\n' && quote != '`') return i - 1;   // string não fecha na linha
+            if (c == '\n' && quote != '`') return i - 1;
             if (c != '\n') out[i] = ' ';
             i++;
         }
@@ -359,7 +306,7 @@ final class JsRuntimeSlices {
         out[start] = ' ';
         while (i < out.length) {
             char c = out[i];
-            if (c == '\n') return i - 1;                   // regex não cruza linha
+            if (c == '\n') return i - 1;
             if (c == '\\') {
                 out[i] = ' ';
                 if (i + 1 < out.length && out[i + 1] != '\n') out[i + 1] = ' ';

@@ -10,13 +10,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Escrita do runtime JS por alcançabilidade (issue #97, T2/S-6).
- *
- * Cobre o que a mantenedora pediu na frente: ausência do que não é alcançável,
- * união dos fechos no build multi-módulo (o primeiro módulo não pode decidir o
- * runtime dos seguintes) e artefato determinístico.
- */
 class JsRuntimePruneWriterTest {
 
     private static String runtime(Path dir) throws IOException {
@@ -71,8 +64,6 @@ class JsRuntimePruneWriterTest {
         new JsArtifactWriter().writeRuntime(dir, List.of("kofPrintln"), List.of());
         String js = runtime(dir);
         assertTrue(js.contains("// kof:units "), "o artefato diz quantas unidades entraram");
-        // hoje nenhum bloco dispara guarda; se um dia disparar, o motivo fica
-        // NO ARTEFATO — nunca uma poda silenciosa sobre o que não se analisou.
         assertEquals(js.contains("// kof:fallback "), !JsRuntimeSlices.select(List.of("kofPrintln")).notes().isEmpty(),
                 "fallback, quando houver, é observável no cabeçalho");
     }

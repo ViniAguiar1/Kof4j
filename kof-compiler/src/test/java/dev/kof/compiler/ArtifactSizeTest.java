@@ -36,7 +36,6 @@ class ArtifactSizeTest {
     // volta a proteger de regressão a partir daqui).
     private static final long HELLO_X86_BYTES = 32_520L;
     private static final int HELLO_X86_SYMS = 37;
-    // T2/S-6: runtime JS por alcançabilidade (era 177_412 com o runtime integral).
     private static final long HELLO_JS_BYTES = 6_873L;
     // Hello riscv64 (cross — só medido onde há toolchain). Pós-S-5 (T1b,
     // 12/09): seções .text.<fn> por função do runtime + `ld --gc-sections`

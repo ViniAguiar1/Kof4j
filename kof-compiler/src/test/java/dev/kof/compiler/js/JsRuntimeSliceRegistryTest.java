@@ -9,21 +9,9 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Inventário do runtime JS por unidade de topo (issue #97, T2/S-6).
- *
- * O teste-pilar é a paridade: com TODAS as sementes vivas, a seleção tem de
- * reproduzir byte a byte o runtime que o writer escrevia por concatenação —
- * a fatiação não pode perder, reordenar nem reindentar uma linha sequer.
- */
 class JsRuntimeSliceRegistryTest {
 
-    /** A ordem que o writer usava — transcrita aqui de propósito: mexer em
-     *  JsRuntimeSlices.BLOCKS sem mexer aqui quebra a paridade. */
     private static String legacyCoreRuntime() {
-        // StringBuilder, não `+`: a concatenação de constantes estoura o
-        // limite de 64 KiB do pool do javac — a mesma razão de o runtime
-        // estar cortado em 17 blocos.
         return new StringBuilder()
                 .append(JsRuntimeCore.CORE_RUNTIME)
                 .append(JsRuntimeUiComponents.UI_COMPONENT_RUNTIME)
